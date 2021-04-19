@@ -883,16 +883,16 @@ spec:
       serviceAccountName: kube-eye
       containers:
       - name: kube-eye
-        image: ivyent/kube-eye:0.2.0
+        image: ivyent/kube-eye:latest
         args: ["--es-address", "http://elasticsearch-logging:9200", "--log-level", "4"]
         imagePullPolicy: Always
         resources:
           limits:
-            cpu: 500m
-            memory: 100Mi
+            cpu: 100m
+            memory: 200Mi
           requests:
             cpu: 50m
-            memory: 80Mi
+            memory: 100Mi
         ports:
         - containerPort: 80
         volumeMounts:
@@ -922,16 +922,16 @@ spec:
       serviceAccountName: kube-eye
       containers:
       - name: kube-eye
-        image: ivyent/kube-eye-worker:0.2.0
+        image: ivyent/kube-eye-worker:latest
         args: ["--server-address", "http://kube-eye:80", "--log-level", "4"]
         imagePullPolicy: Always
         resources:
           limits:
-            cpu: 500m
-            memory: 800Mi
+            cpu: 100m
+            memory: 100Mi
           requests:
             cpu: 50m
-            memory: 100Mi
+            memory: 50Mi
         ports:
         - containerPort: 80
           name: restapi
