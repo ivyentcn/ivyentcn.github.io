@@ -1,0 +1,230 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: augur
+  labels:
+    k8s-app: augur
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  ports:
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 8900
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    k8s-app: augur
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: augur
+  labels:
+    k8s-app: augur
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: augur
+  template:
+    metadata:
+      labels:
+        k8s-app: augur
+    spec:
+      hostAliases:
+      - ip: "__HAPROXY_IP__"
+        hostnames:
+        - "augur.openshift.local"
+      containers:
+      - name: augur
+        image: ivyent/augur:1.0.1
+        args:
+        - --tls=false
+        - --tls-listen=0.0.0.0:8900
+        - --http-listen=0.0.0.0:8080
+        - --store-address=mysql://augur:augur@tcp(augur-mariadb:3306)/augur?charset=utf8mb4&parseTime=True&loc=Local
+        - --advertise-url=https://augur.openshift.local:443
+        - --log-level=6
+        imagePullPolicy: Always
+        resources:
+          limits:
+            cpu: 4000m
+            memory: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 2Gi
+        ports:
+        - containerPort: 8900
+          name: https
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: augur-data
+          mountPath: /opt/augur/data
+      volumes:
+      - name: augur-data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: augur-mariadb
+  labels:
+    k8s-app: augur-mariadb
+    kubernetes.io/cluster-service: "true"
+    addonmanager.kubernetes.io/mode: Reconcile
+spec:
+  ports:
+    - name: mysql
+      port: 3306
+      protocol: TCP
+      targetPort: 3306
+  publishNotReadyAddresses: true
+  selector:
+    k8s-app: augur-mariadb
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: augur-mariadb-pv
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 3Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data/augur-mariadb/data"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: augur-mariadb-pvc
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: augur-mariadb
+  labels:
+    k8s-app: augur-mariadb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: augur-mariadb
+  template:
+    metadata:
+      labels:
+        k8s-app: augur-mariadb
+    spec:
+      containers:
+      - name: mariadb
+        image: registry.access.redhat.com/rhscl/mariadb-102-rhel7:latest
+        command:
+        - bash
+        - -c
+        - "run-mysqld --max-allowed-packet=1073741824 --max-long-data-size=2147483648 --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci"
+        imagePullPolicy: Always
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: root
+        - name: MYSQL_USER
+          value: augur
+        - name: MYSQL_PASSWORD
+          value: augur
+        - name: MYSQL_DATABASE
+          value: augur
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: data
+          mountPath: /usr/lib/mysql
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: augur-mariadb-pvc
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: augur
+spec:
+  host: augur.openshift.local
+  port:
+    targetPort: 8080
+  to:
+    kind: Service
+    name: augur
+  tls:
+    termination: edge
+    key: |-
+      -----BEGIN PRIVATE KEY-----
+      MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDjHIuqZlgrCJqB
+      3IRpsxKgyrGaLqJX/2NKMjkD0FA+Pv62nRKz8c2EtYHFt0u0Q9lQ2tL2dpBUA+VV
+      ncR3vV3TKYIWWQqhMnWAwMt/xzi+xxUKSh5cMJ0WdBCI9DxOmKPPA30lICoacQ+G
+      84q7Vm2Wcd87u/x/EI2K43R54HzDsZH+16UHVCGObYZ0VwqQCsmBcdq/7meAj3Ox
+      OBLqq1maCBogawpbCEXy8xy528qISGDZI51tV6iy+YnivWCIc14K4JovdudXAD7z
+      8zWNLdPsa/l6Wuzzu1vsLmYdo1BL0rD+MdEdRfBFt4SLxVEh8dDJuDCv3OPR7niU
+      Ai3yLPkVAgMBAAECggEBAMNPQS0BZsFbXMRhB95+iX6N0b5ubF6Q2qpsFmwZMWjW
+      c+ZHnlXxlHSUQ03tG8Wis7i89r/NpsEZuJewXc07pPx7rcvaNzH5WuOm6Vqx0TL/
+      sjBvHTza8bzlg3LD1zkgO39D2NOcnZivslK0DpKc+RFwTDHqsHH1okPW58wIKkN/
+      SvMIWBP1UySVeLE24DTkZk1qzgqBAc8JQlmx0AHQwbznLvRkQRsuNdnDNRsv5fqZ
+      nA+OPlRuA6w1SQh/1sAVr0wght4QpT57VJAizxIhwtkZNuvyBTY8cnCAJ1KDsN+l
+      mSLCiq+0vAbb9wua/f30IT9gAN7H/HI5NfeeGpf5PeECgYEA9GvtDLpRCAnXc2Er
+      vUWXz0Yqxz9v/CoP+2DCwbNoqiMNKrBiYqbW1M5YKd6HNAOaPJQNU+2G9kE2GS1j
+      Z70hCR1pcYzNPIINOyUoAy6dXYbniAAlSpHko930xXh5KCbgYb8K6UIA2CSYrDvE
+      UQswAA9glEUeOgsDNxiFPI0oyCMCgYEA7d6zvzxFrLa6ycBI1o7aMt+81NTWl3Op
+      zBiNQZL5RFCtC7qDBBPDxQwSiqWsTVvf7jrwNvRwno64Z/YHYR7XldrlyzedHaCC
+      3M0ynilKDbG8VKykYwICI70I3OriHq5rYjah2SEmcct45k31sSipeP4R/JKH4y5G
+      Pq47x3gvcWcCgYEAqMaVq4JETe6tzUg98bZKe6ASDf+qDk/lNUm9cg+2qDUH9IBT
+      j5dxJQVPL6ovZiVOraH2Cgwsc4LYHk6PI6UfWLHsi7IUTkHnbP3dQUVA+MIcwnaH
+      SZSwcs7jJDBqSOV/bz+CA0vGVXn/yn6Cswusm34CzJ9lneLY14ShDAzVKk0CgYBt
+      37CnZO/KF52wE2GRueqQFUjkBmwZCRQlcjHNWFZLd/h2snBSMc779deas2wjT4zg
+      Pdk3iTF8C/CiFMLT2as7TSFX/RhV1w6bby0yYWATc0XK1vQXx5W1bFvrr5NDGM4B
+      T7ry0J0xcwslVl1mt6GQgctNH2IlTfqkeVajjKBdgQKBgQDUx1hK5ktsNKBmigVt
+      aFQ0dOuUIi57wm5xvxjt6D/UXVbgtGpoVru7zm/fIgfTr7HWPPLxB0/o9Z6Tp7HP
+      GERUToqITihzN9RKy4d4RSH9s71wuBx9Af+if1RzK7n2dY0XELWnU+fB0wpVTAsm
+      rIED35Igh5SYGo/SjV8l8RU5wg==
+      -----END PRIVATE KEY-----
+    certificate: |-
+      -----BEGIN CERTIFICATE-----
+      MIIDbzCCAlegAwIBAgIUTuLwH3jIiEB8hspL6tQ8Hx/aDIowDQYJKoZIhvcNAQEF
+      BQAwRTEaMBgGA1UEAwwRbXlhdWd1ci5pdnllbnQuY24xGjAYBgNVBAoMEW15YXVn
+      dXIuaXZ5ZW50LmNuMQswCQYDVQQGEwJDTjAgFw0yMTAzMTUwMDAwMDBaGA8yMDUw
+      MDMxNjAwMDAwMFowfTELMAkGA1UEBhMCQ04xGjAYBgNVBAgMEW15YXVndXIuaXZ5
+      ZW50LmNuMRowGAYDVQQHDBFteWF1Z3VyLml2eWVudC5jbjEaMBgGA1UECgwRbXlh
+      dWd1ci5pdnllbnQuY24xGjAYBgNVBAMMEW15YXVndXIuaXZ5ZW50LmNuMIIBIjAN
+      BgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4xyLqmZYKwiagdyEabMSoMqxmi6i
+      V/9jSjI5A9BQPj7+tp0Ss/HNhLWBxbdLtEPZUNrS9naQVAPlVZ3Ed71d0ymCFlkK
+      oTJ1gMDLf8c4vscVCkoeXDCdFnQQiPQ8TpijzwN9JSAqGnEPhvOKu1ZtlnHfO7v8
+      fxCNiuN0eeB8w7GR/telB1Qhjm2GdFcKkArJgXHav+5ngI9zsTgS6qtZmggaIGsK
+      WwhF8vMcudvKiEhg2SOdbVeosvmJ4r1giHNeCuCaL3bnVwA+8/M1jS3T7Gv5elrs
+      87tb7C5mHaNQS9Kw/jHRHUXwRbeEi8VRIfHQybgwr9zj0e54lAIt8iz5FQIDAQAB
+      ox0wGzALBgNVHREEBDACggAwDAYDVR0TAQH/BAIwADANBgkqhkiG9w0BAQUFAAOC
+      AQEAz2RdisqjDdILj6l55SDah1RtiMyY5L4YZg+mzRsDokkE3kDHZjVeRAirrIhU
+      9ReP54Gmv4hiv495MgiN4GO/839yot5T8QMOUkILSGFQEckRChgJ58BIHec44eAf
+      v/KQfoKl3vH14I6wNE4ypN0+kUJs9feVArK8kRclYWRWa1aTmC7zURFWLECcO5lB
+      zPIU8qA4yoaol01d71uAXsaMXmROymfu6SDXOi32wrx64cpNePXeuwHQ85yF52HN
+      REHqmP2RJ7pW8kWemExOdHy7JSJzxVg4Dg4SfOHf/5Av9GL2hyDICONsBfwJDVRN
+      tSY0mL8W4OqFAn/R6557Ya5zRw==
+      -----END CERTIFICATE-----
