@@ -659,7 +659,6 @@ spec:
       containers:
       - image: ivyent/elasticsearch:7.4.2
         name: elasticsearch-logging
-        imagePullPolicy: Always
         resources:
           # need more cpu upon initialization, therefore burstable class
           limits:
