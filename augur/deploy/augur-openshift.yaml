@@ -156,6 +156,10 @@ spec:
       labels:
         k8s-app: augur
     spec:
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
       hostAliases:
       - ip: "__HAPROXY_IP__"
         hostnames:
@@ -1240,4 +1244,3 @@ spec:
             cpu: 100m
             memory: 128Mi
       terminationGracePeriodSeconds: 3
-

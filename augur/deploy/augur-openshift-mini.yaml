@@ -82,13 +82,13 @@ spec:
         env:
         - name: MYSQL_ROOT_PASSWORD
           value: root
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-          requests:
-            cpu: 1000m
-            memory: 256Mi
+        # resources:
+        #   limits:
+        #     cpu: 2000m
+        #     memory: 2Gi
+        #   requests:
+        #     cpu: 1000m
+        #     memory: 1Gi
         ports:
         - containerPort: 3306
         volumeMounts:
@@ -156,6 +156,10 @@ spec:
       labels:
         k8s-app: augur
     spec:
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        fsGroup: 0
       hostAliases:
       - ip: "__HAPROXY_IP__"
         hostnames:
@@ -173,13 +177,13 @@ spec:
         - --advertise-url=https://augur.augur.openshift.local:443
         - --log-level=6
         imagePullPolicy: Always
-        resources:
-          limits:
-            cpu: 4000m
-            memory: 2Gi
-          requests:
-            cpu: 1000m
-            memory: 2Gi
+        # resources:
+        #   limits:
+        #     cpu: 4000m
+        #     memory: 2Gi
+        #   requests:
+        #     cpu: 1000m
+        #     memory: 1Gi
         ports:
         - containerPort: 8900
           name: https
@@ -326,13 +330,13 @@ spec:
           value: "True"
         - name: ZBX_JAVAGATEWAY
           value: localhost
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 2Gi
-          requests:
-            cpu: 100m
-            memory: 500Mi
+        # resources:
+        #   limits:
+        #     cpu: 1000m
+        #     memory: 1Gi
+        #   requests:
+        #     cpu: 100m
+        #     memory: 500Mi
         ports:
         - containerPort: 10051
 ---
@@ -379,13 +383,13 @@ spec:
           value: zabbix-server
         - name: ZBX_SERVER_PORT
           value: "10051"
-        resources:
-          limits:
-            cpu: 100m
-            memory: 1Gi
-          requests:
-            cpu: 100m
-            memory: 128Mi
+        # resources:
+        #   limits:
+        #     cpu: 100m
+        #     memory: 1Gi
+        #   requests:
+        #     cpu: 100m
+        #     memory: 256Mi
         ports:
         - containerPort: 10052
 ---
@@ -456,13 +460,13 @@ spec:
           value: zabbix
         - name: PHP_TZ
           value: "Asia/Shanghai"
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-          requests:
-            cpu: 100m
-            memory: 128Mi
+        # resources:
+        #   limits:
+        #     cpu: 1000m
+        #     memory: 1Gi
+        #   requests:
+        #     cpu: 100m
+        #     memory: 256Mi
         ports:
         - containerPort: 10052
 ---
@@ -509,13 +513,13 @@ spec:
           echo Server=`ping -c 1 zabbix-server-inner | head -n 1 | awk -F '[()]' '{print $2}'` >> /etc/zabbix/zabbix_agentd.conf &&
           echo ServerActive=`ping -c 1 zabbix-server-inner | head -n 1 | awk -F '[()]' '{print $2}'`:10051 >> /etc/zabbix/zabbix_agentd.conf &&
           /usr/sbin/zabbix_agentd --foreground -c /etc/zabbix/zabbix_agentd.conf
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-          requests:
-            cpu: 100m
-            memory: 128Mi
+        # resources:
+        #   limits:
+        #     cpu: 1000m
+        #     memory: 1Gi
+        #   requests:
+        #     cpu: 100m
+        #     memory: 128Mi
         env:
 #        - name: ZBX_PASSIVESERVERS
 #          value: zabbix-server
@@ -659,15 +663,14 @@ spec:
       containers:
       - image: ivyent/elasticsearch:7.4.2
         name: elasticsearch-logging
-        imagePullPolicy: Always
-        resources:
-          # need more cpu upon initialization, therefore burstable class
-          limits:
-            cpu: 1000m
-            memory: 3Gi
-          requests:
-            cpu: 100m
-            memory: 256Mi
+        # resources:
+        #   # need more cpu upon initialization, therefore burstable class
+        #   limits:
+        #     cpu: 4000m
+        #     memory: 3Gi
+        #   requests:
+        #     cpu: 2000m
+        #     memory: 2Gi
         ports:
         - containerPort: 9200
           name: db
@@ -1159,13 +1162,13 @@ spec:
         env:
         - name: FLUENTD_ARGS
           value: --no-supervisor -q
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-          requests:
-            cpu: 100m
-            memory: 256Mi
+        # resources:
+        #   limits:
+        #     cpu: 1000m
+        #     memory: 3Gi
+        #   requests:
+        #     cpu: 500m
+        #     memory: 1Gi
         volumeMounts:
         - name: varlog
           mountPath: /var/log
@@ -1233,12 +1236,11 @@ spec:
           sed -i 's/localhost:9200/elasticsearch-logging:9200/g' metricbeat.yml;
           ./metricbeat setup -e;
           ./metricbeat -e
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 1Gi
-          requests:
-            cpu: 100m
-            memory: 256Mi
+        # resources:
+        #   limits:
+        #     cpu: 1000m
+        #     memory: 1Gi
+        #   requests:
+        #     cpu: 100m
+        #     memory: 128Mi
       terminationGracePeriodSeconds: 3
-
